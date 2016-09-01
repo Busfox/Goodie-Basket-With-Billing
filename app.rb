@@ -19,7 +19,7 @@ class GoodieBasket < Sinatra::Base
 		shop = params[:shop]
 		scopes = "read_products,write_products,read_orders"
 
-		install_url = "http://#{shop}/admin/oauth/authorize?client_id=#{@key}&scope=#{scopes}&redirect_uri=https://#{@app_url}/goodiebasket/auth"
+		install_url = "https://#{shop}/admin/oauth/authorize?client_id=#{@key}&scope=#{scopes}&redirect_uri=https://#{@app_url}/goodiebasket/auth"
 		redirect install_url
 	end
 
@@ -58,13 +58,14 @@ class GoodieBasket < Sinatra::Base
 		session = ShopifyAPI::Session.new(shop, @tokens[shop])
 		# activate session
 		ShopifyAPI::Base.activate_session(session)
-
-		#product = ShopifyAPI::Product.find(5263432706)
-		#puts product.title
-
+binding.pry
 		ShopifyAPI::Webhook.create("topic": "orders\/create", "address": "https:\/\/drewbie.ngrok.io\/goodiebasket\/webhook", "format": "json")
-
+			
+		
+		create_recurring_application_charge
+		
 		redirect '/goodiebasket'
+
 
 	end
 
@@ -72,7 +73,7 @@ class GoodieBasket < Sinatra::Base
 
 	get '/goodiebasket' do
 		@products = ShopifyAPI::Product.find(:all)
-    erb :index
+	erb :index
   end
 
   post '/goodiebasket' do
@@ -91,11 +92,49 @@ class GoodieBasket < Sinatra::Base
 
 	end
 
+	get '/activatecharge' do
+    charge_id  = request.params['charge_id']
+    recurring_application_charge = ShopifyAPI::RecurringApplicationCharge.find(charge_id)
+    recurring_application_charge.status == "accepted" ? recurring_application_charge.activate : "Please accept the charge"
+
+    puts 'Charge activated!'
+    redirect '/goodiebasket'
+
+  end
+
 	helpers do
 		def verify_webhook(data, hmac_header)
 			digest = OpenSSL::Digest.new('sha256')
 			calculated_hmac = Base64.encode64(OpenSSL::HMAC.digest(digest, @secret, data)).strip
 			calculated_hmac == hmac_header
+		end
+	
+
+		def create_recurring_application_charge
+	    if not ShopifyAPI::RecurringApplicationCharge.current
+	      @recurring_application_charge = ShopifyAPI::RecurringApplicationCharge.new(
+	        name: "Goodie Basket Plan",
+	        price: 14.99,
+	        return_url: "https:\/\/drewbie.ngrok.io\/activatecharge",
+	        test: true,	
+	        capped_amount: 100,
+	        terms: "$1 for every order created")
+
+	      if @recurring_application_charge.save
+	      	puts 'Application charge created!'
+	        redirect @recurring_application_charge.confirmation_url
+	      #else
+	      #	puts 'Application charge already exists.'
+	      #	redirect '/goodiebasket'
+	      end
+	    end
+	  end
+	  def create_usage_charge
+      usage_charge = ShopifyAPI::UsageCharge.new(description: "1 dollar per order plan", price: 1.0)
+      recurring_application_charge_id = ShopifyAPI::RecurringApplicationCharge.last
+      usage_charge.prefix_options = {recurring_application_charge_id: recurring_application_charge_id.id}
+      usage_charge.save
+      puts "Usage charge created successfully!" 
 		end
 	end
 
@@ -115,7 +154,8 @@ class GoodieBasket < Sinatra::Base
 
 		# Otherwise, webhook is verified:
 		ShopifyAPI::Session.temp(shop, token) {
-
+		create_usage_charge
+		puts 'usage charge created'
 		json_data = JSON.load data
 
 		line_items = json_data['line_items']
@@ -145,8 +185,6 @@ class GoodieBasket < Sinatra::Base
 		return [200, "All good brah"]
 	}
 	end
-
-
 end
 
 GoodieBasket.run!
