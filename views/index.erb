@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>Goodie Basket</title>
+  </head>
+
+  <body>
+    <h1>Goodie Basket</h1>
+    <p>First, choose which product you would like to be the gift basket product. Enter the variant id for that product in the first field. You can find the variant id in the list below. Next, enter the variant ids for the variants you want to be goodies in the basket. You can separate each by a comma, like this: 123456789,234567891,345678912</p>
+
+    <form action="/goodiebasket" method="POST">
+  		Your gift basket product: <input type="text" name="basket">
+  		<br/><br/>
+    	Free gifts(separated by commas): <input type="text" name="gifts">
+    	<br/><br/>
+    	<input type="submit">
+		</form>
+
+		<% @products.each do |product| %>
+		<p><b><%= product.title %></b></p>
+		<% product.variants.each do |variant| %>
+		<p> -----<%= variant.id %></p>
+		<% end %>
+		<% end %>
+
+  </body>
+</html>
