@@ -58,7 +58,6 @@ class GoodieBasket < Sinatra::Base
 		session = ShopifyAPI::Session.new(shop, @tokens[shop])
 		# activate session
 		ShopifyAPI::Base.activate_session(session)
-binding.pry
 		ShopifyAPI::Webhook.create("topic": "orders\/create", "address": "https:\/\/drewbie.ngrok.io\/goodiebasket\/webhook", "format": "json")
 			
 		
